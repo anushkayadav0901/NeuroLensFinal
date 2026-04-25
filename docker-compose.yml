@@ -1,0 +1,24 @@
+services:
+  neurolens-backend:
+    extends:
+      file: ./docker-compose.backend.yml
+      service: neurolens-backend
+    profiles:
+      - all
+      - backend
+    networks:
+      - tunnel-net
+
+  neurolens-frontend:
+    extends:
+      file: ./docker-compose.frontend.yml
+      service: neurolens-frontend
+    profiles:
+      - all
+      - frontend
+    networks:
+      - tunnel-net
+
+networks:
+  tunnel-net:
+    driver: bridge

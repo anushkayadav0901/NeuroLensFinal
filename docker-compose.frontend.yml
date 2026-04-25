@@ -1,0 +1,11 @@
+services:
+    neurolens-frontend:
+        build:
+            context: ./frontend
+            dockerfile: ../Dockerfile.frontend
+            args:
+                VITE_API_BASE_URL: ${VITE_API_BASE_URL}
+        container_name: neurolens-frontend
+        restart: unless-stopped
+        ports:
+            - "3000:80"
