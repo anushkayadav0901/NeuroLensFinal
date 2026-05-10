@@ -20,6 +20,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.routes.analyze import router as analyze_router
+from app.routes.heatmap import router as heatmap_router
+from app.routes.learning import router as learning_router
 from app.routes.reports import router as reports_router
 
 # Create FastAPI app
@@ -45,6 +47,8 @@ app.mount("/static", StaticFiles(directory=static_dir), name="static")
 
 # Register routes
 app.include_router(analyze_router, prefix="/api", tags=["Analysis"])
+app.include_router(heatmap_router, prefix="/api", tags=["Explainability"])
+app.include_router(learning_router, prefix="/api", tags=["Learning"])
 app.include_router(reports_router, prefix="/api/reports", tags=["Reports"])
 
 

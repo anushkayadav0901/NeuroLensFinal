@@ -3,10 +3,17 @@ import brainImg from "../components/brainlandingpage.png";
 import logoImg from "../components/logo.png";
 import { SessionProvider } from "../features/SessionContext";
 import RiskEstimator from "../features/RiskEstimator";
-import MRIViewer from "../features/MRIViewer";
 import AnatomyExplorer from "../features/AnatomyExplorer";
 import ClinicalChat from "../features/ClinicalChat";
 import SessionDashboard from "../features/SessionDashboard";
+import ProblemStatement from "../features/landing-info/ProblemStatement";
+import CognitiveLoadSection from "../features/landing-info/CognitiveLoadSection";
+import HowItWorks from "../features/landing-info/HowItWorks";
+import ExplainableAI from "../features/landing-info/ExplainableAI";
+import BeforeAfter from "../features/landing-info/BeforeAfter";
+import MBBSLearning from "../features/landing-info/MBBSLearning";
+import FinalCTA from "../features/landing-info/FinalCTA";
+import "../features/landing-info/landing-info.css";
 
 export default function LandingPage() {
   const navigate = useNavigate();
@@ -115,6 +122,17 @@ export default function LandingPage() {
             </button>
           </div>
 
+        </div>
+
+        {/* Informational sections */}
+        <div className="li-block">
+          <ProblemStatement />
+          <CognitiveLoadSection />
+          <HowItWorks />
+          <ExplainableAI />
+          <BeforeAfter />
+          <MBBSLearning />
+          <FinalCTA />
         </div>
 
         {/* Interactive Features Section */}

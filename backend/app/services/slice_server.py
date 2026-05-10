@@ -5,8 +5,12 @@ Serves 2D slice images from the most recent analysis volume.
 Keeps the volume + mask in memory and renders slices as PNG on demand.
 """
 
+from __future__ import annotations
+
 import io
 import threading
+from typing import Dict, Optional
+
 import numpy as np
 from PIL import Image
 
@@ -17,15 +21,55 @@ _lock = threading.Lock()
 _current_data = {
     "volume": None,
     "mask": None,
+    "heatmaps": {},
+    "modality_volumes": {},
+    "metrics": None,
+    "reasoning_summary": None,
 }
 
 
-def store_slice_data(volume: np.ndarray, mask: np.ndarray):
-    """Store volume and mask from the latest analysis for slice serving."""
+def store_slice_data(
+    volume: np.ndarray,
+    mask: np.ndarray,
+    heatmaps: Optional[Dict[str, np.ndarray]] = None,
+    modality_volumes: Optional[Dict[str, np.ndarray]] = None,
+    metrics: Optional[dict] = None,
+    reasoning_summary: Optional[dict] = None,
+):
+    """Store volume, mask, optional heatmaps and modality volumes from the latest analysis."""
     with _lock:
         _current_data["volume"] = volume.copy()
         _current_data["mask"] = mask.copy()
-    print(f"[SliceServer] Stored volume {volume.shape} and mask {mask.shape} for slice viewing")
+        _current_data["heatmaps"] = (
+            {k: v.copy() for k, v in heatmaps.items()} if heatmaps else {}
+        )
+        _current_data["modality_volumes"] = (
+            {k: v.copy() for k, v in modality_volumes.items()} if modality_volumes else {}
+        )
+        _current_data["metrics"] = metrics
+        _current_data["reasoning_summary"] = reasoning_summary
+    print(
+        f"[SliceServer] Stored volume {volume.shape} and mask {mask.shape}"
+        f" + {len(_current_data['heatmaps'])} heatmaps for slice viewing"
+    )
+
+
+def get_heatmap_volume(modality: str = "flair"):
+    """Return the in-memory heatmap volume for a modality (None when absent)."""
+    with _lock:
+        return _current_data["heatmaps"].get(modality.lower())
+
+
+def get_base_volume_for(modality: str = "flair"):
+    """Return modality volume for slicing (falls back to the primary volume)."""
+    with _lock:
+        modal = _current_data["modality_volumes"].get(modality.lower())
+        return modal if modal is not None else _current_data["volume"]
+
+
+def get_reasoning_summary():
+    with _lock:
+        return _current_data["reasoning_summary"]
 
 
 def get_slice_info():

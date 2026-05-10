@@ -1,6 +1,8 @@
 import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "../AppContext";
 import logoImg from "./logo.png";
+import VoiceControlButton from "../features/voice/VoiceControlButton";
+import ReportButton from "../features/report/ReportButton";
 
 export default function Navbar() {
   const navigate = useNavigate();
@@ -47,8 +49,16 @@ export default function Navbar() {
             </button>
           </>
         )}
+        <button
+          className={`nav-link ${path.startsWith("/learn") ? "active" : ""}`}
+          onClick={() => navigate("/learn")}
+        >
+          Learning Mode
+        </button>
       </div>
       <div className="nav-status">
+        <ReportButton compact />
+        <VoiceControlButton />
         <span className="dot" />
         <span>{modelStatus?.exists ? `Model: ${modelStatus.arch}` : "Ready"}</span>
       </div>

@@ -36,6 +36,7 @@ export function AppProvider({ children }) {
   const [result, setResult] = useState({
     summary: {}, metrics: {}, reasoning: [], pipeline: {},
     input_metadata: {}, mesh_url: null, brain_mesh_url: null, slice_info: null,
+    anatomical_proximity: [], surgical_note: "", heatmap: { modalities: [], reasoning: null },
   });
 
   const hasResults = Boolean(result.mesh_url);
@@ -50,6 +51,9 @@ export function AppProvider({ children }) {
       mesh_url: data.mesh_url || null,
       brain_mesh_url: data.brain_mesh_url || null,
       slice_info: data.slice_info || null,
+      anatomical_proximity: data.anatomical_proximity || [],
+      surgical_note: data.surgical_note || "",
+      heatmap: data.heatmap || { modalities: [], reasoning: null },
     });
   };
 

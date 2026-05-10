@@ -17,9 +17,11 @@ from app.services.brats_loader import list_brats_cases, load_brats_case
 from app.services.dicom_loader import load_volume_from_input, load_volume_from_npy
 from app.services.evaluator import evaluate_segmentation
 from app.services.explainer import generate_reasoning
+from app.services.heatmap import build_heatmaps, compute_reasoning_summary
 from app.services.mesh_builder import build_brain_mesh, build_mesh
 from app.services.metrics import extract_metrics
 from app.services.postprocessor import postprocess_mask
+from app.services.risk_radar import build_surgical_note, compute_proximity
 from app.services.sample_data import ensure_sample_dataset
 from app.services.segmentor import get_model_status, load_mask_from_path, segment_tumor, segment_tumor_with_info
 from app.services.slice_server import store_slice_data, get_slice_info, render_slice
@@ -62,9 +64,6 @@ def _build_analysis_response(
     print("\n[Pipeline Step 3/6] Post-processing mask...")
     clean_mask = postprocess_mask(mask)
 
-    # Store volume + mask for the 2D slice viewer
-    store_slice_data(volume, clean_mask)
-
     print("\n[Pipeline Step 4/6] Generating 3D meshes...")
     tumor_mesh = build_mesh(
         clean_mask,
@@ -85,6 +84,32 @@ def _build_analysis_response(
 
     print("\n[Pipeline Step 6/6] Generating reasoning trace...")
     reasoning = generate_reasoning(metrics)
+
+    print("[Risk Radar] Computing anatomical proximity...")
+    anatomical_proximity = compute_proximity(clean_mask, voxel_spacing=voxel_spacing, top_n=10)
+    surgical_note = build_surgical_note(anatomical_proximity, metrics.get("region", "tumor"))
+    if anatomical_proximity:
+        closest = anatomical_proximity[0]
+        print(f"  Closest structure: {closest['name']} @ {closest['surface_distance_mm']} mm ({closest['risk_zone']})")
+
+    print("[Heatmap] Building per-modality attention volumes...")
+    try:
+        heatmaps = build_heatmaps(volume, clean_mask, modality_volumes=modality_volumes)
+        reasoning_summary = compute_reasoning_summary(heatmaps, clean_mask, metrics)
+        print(f"  Heatmaps generated for: {list(heatmaps.keys())}")
+    except Exception as exc:
+        print(f"  [WARN] Heatmap generation skipped: {exc}")
+        heatmaps = {}
+        reasoning_summary = None
+
+    store_slice_data(
+        volume,
+        clean_mask,
+        heatmaps=heatmaps,
+        modality_volumes=modality_volumes,
+        metrics=metrics,
+        reasoning_summary=reasoning_summary,
+    )
 
     response = {
         "status": "success",
@@ -112,6 +137,12 @@ def _build_analysis_response(
             "risk_level": metrics["risk_level"],
         },
         "slice_info": get_slice_info(),
+        "anatomical_proximity": anatomical_proximity,
+        "surgical_note": surgical_note,
+        "heatmap": {
+            "modalities": list(heatmaps.keys()),
+            "reasoning": reasoning_summary,
+        },
     }
 
     print("\n" + "=" * 60)

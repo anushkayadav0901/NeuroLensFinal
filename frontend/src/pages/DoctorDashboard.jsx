@@ -1,84 +1,16 @@
-import { useState, useRef, useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import { useApp } from "../AppContext";
 import Viewer from "../components/Viewer";
 import SliceViewer from "../components/SliceViewer";
-import ValidationModal from "../components/ValidationModal";
-import PatientReport from "../components/PatientReport";
-
-/* ── Gemini API ── */
-const GEMINI_API_KEY = "AIzaSyCZd8tEkKsoZdlBNwAjwtQClVPiDZxMGOY";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
-
-function buildScanContext(result) {
-  const s = result.summary || {};
-  const m = result.metrics || {};
-  const p = result.pipeline || {};
-  const r = result.reasoning || [];
-  return `You are NeuroLens AI — a strictly scoped medical assistant embedded in the NeuroLens brain MRI analysis platform.
-
-STRICT RULES — FOLLOW WITHOUT EXCEPTION:
-1. Only answer questions directly related to: brain MRI scans, brain tumor segmentation, and the specific scan report below.
-2. If the user asks ANYTHING outside MRI/neurology/this report, respond ONLY with: "I can only assist with questions about brain MRI scans and this scan report."
-3. Do NOT volunteer extra information beyond what is asked.
-4. Do NOT fabricate values or conclusions not present in the report data.
-5. Do NOT give treatment plans or medication recommendations.
-6. Always recommend consulting a certified specialist for clinical decisions.
-7. Keep answers concise and strictly on-topic.
-
-=== SCAN REPORT ===
-SUMMARY:
-- Region: ${s.region || "N/A"}
-- Volume: ${s.volume || "N/A"}
-- Dimensions: ${s.dimensions || "N/A"}
-- Laterality: ${s.laterality || "N/A"}
-- Depth from surface: ${s.depth || "N/A"}
-- Risk Level: ${s.risk_level || "N/A"}
-
-CLINICAL METRICS:
-- Tumor volume (cm³): ${m.tumor_volume_cm3 ?? "N/A"}
-- Region function: ${m.region_function || "N/A"}
-- Midline distance: ${m.midline_distance_mm ?? "N/A"} mm
-- Centroid voxel: ${(m.centroid_voxel || []).join(", ") || "N/A"}
-- Risk factors: ${(m.risk_factors || []).join(", ") || "none"}
-
-PIPELINE:
-- Segmentation mode: ${p.segmentation_mode || "N/A"}
-- Voxel spacing: ${(p.voxel_spacing_mm || []).join(" × ") || "N/A"} mm
-
-CLINICAL REASONING:
-${r.map((step) => `Step ${step.step} - ${step.title} (${step.confidence}): ${step.detail}`).join("\n") || "No reasoning steps available."}
-=== END OF REPORT ===
-
-Answer only what is asked. Do not add unsolicited information.`;
-}
-
-async function askGemini(messages, systemContext) {
-  // Only send real conversation turns — skip initial hardcoded UI messages
-  const realMessages = messages.filter((m) => !m.initial);
-  const contents = realMessages.map((m) => ({
-    role: m.role === "ai" ? "model" : "user",
-    parts: [{ text: m.text }],
-  }));
-  // Gemini needs at least 1 user message
-  if (!contents.some((c) => c.role === "user")) return "Please ask a question about the scan report.";
-  const body = {
-    system_instruction: { parts: [{ text: systemContext }] },
-    contents,
-    generationConfig: { temperature: 0.2, maxOutputTokens: 800 },
-  };
-  const res = await fetch(GEMINI_URL, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const err = await res.json();
-    throw new Error(err?.error?.message || "Gemini API error");
-  }
-  const data = await res.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || "I couldn't generate a response. Please try again.";
-}
+import RiskRadarPanel from "../features/risk-radar/RiskRadarPanel";
+import StructureMarkers2D from "../features/risk-radar/StructureMarkers2D";
+import AIValidationPanel from "../features/validation/AIValidationPanel";
+import HeatmapControls from "../features/heatmap/HeatmapControls";
+import ReasoningSummaryCard from "../features/heatmap/ReasoningSummaryCard";
+import ReportButton from "../features/report/ReportButton";
+import { useVoice } from "../features/voice/VoiceContext";
+import { API_BASE } from "../AppContext";
 
 /* ── Upload Tab ─────────────────────────────────────── */
 function UploadTab() {
@@ -245,50 +177,38 @@ function ResultsTab() {
   const { result } = useApp();
   const s = result.summary;
   const m = result.metrics;
+  const proximity = result.anatomical_proximity || [];
   const riskClass = `risk-${(m?.risk_level || "low").toLowerCase()}`;
 
   const [viewMode, setViewMode] = useState("3d");
-  const [chatMessages, setChatMessages] = useState([
-    { role: "ai", text: `Tumor detected in ${s?.region || "brain region"}. Volume: ${s?.volume || "N/A"}.`, initial: true },
-    { role: "ai", text: `Laterality: ${s?.laterality || "N/A"}. Risk level assessed as ${s?.risk_level || "N/A"}.`, initial: true },
-    { role: "ai", text: "Ask me anything about this scan report.", initial: true },
-  ]);
-  const [chatInput, setChatInput] = useState("");
-  const [chatLoading, setChatLoading] = useState(false);
-  const chatEndRef = useRef(null);
+  const [showStructureMarkers, setShowStructureMarkers] = useState(false);
 
+  const heatmapInfo = result.heatmap || { modalities: [], reasoning: null };
+  const availableModalities = heatmapInfo.modalities || [];
+  const [heatmapEnabled, setHeatmapEnabled] = useState(false);
+  const [heatmapModality, setHeatmapModality] = useState(
+    availableModalities.includes("flair") ? "flair" : availableModalities[0] || "flair",
+  );
+  const [heatmapOpacity, setHeatmapOpacity] = useState(0.6);
+  const [heatmapUncertainty, setHeatmapUncertainty] = useState(false);
+
+  const { registerHook } = useVoice();
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages]);
-
-  const handleSend = async () => {
-    const msg = chatInput.trim();
-    if (!msg || chatLoading) return;
-    const newMessages = [...chatMessages, { role: "user", text: msg }];
-    setChatMessages(newMessages);
-    setChatInput("");
-    setChatLoading(true);
-    try {
-      const systemContext = buildScanContext(result);
-      const aiText = await askGemini(newMessages, systemContext);
-      setChatMessages((prev) => [...prev, { role: "ai", text: aiText }]);
-    } catch (err) {
-      setChatMessages((prev) => [...prev, { role: "ai", text: `⚠️ ${err.message}` }]);
-    } finally {
-      setChatLoading(false);
-    }
-  };
-
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      handleSend();
-    }
-  };
+    const offHeatmap = registerHook("toggleHeatmap", (enabled) =>
+      setHeatmapEnabled(Boolean(enabled)),
+    );
+    const offStructures = registerHook("toggleStructures", (enabled) =>
+      setShowStructureMarkers(Boolean(enabled)),
+    );
+    return () => {
+      offHeatmap?.();
+      offStructures?.();
+    };
+  }, [registerHook]);
 
   return (
     <div className="dd-results-layout">
-      {/* ── Left panel: stats ── */}
+      {/* ── Left panel: stats + risk radar ── */}
       <div className="dd-left-panel">
         <div className="dd-panel-card">
           <div className="dd-card-header">
@@ -310,25 +230,30 @@ function ResultsTab() {
             </div>
           </div>
         </div>
+
+        <RiskRadarPanel proximity={proximity} surgicalNote={result.surgical_note} />
       </div>
 
       {/* ── Center: toggle + viewer ── */}
       <div className="dd-center-panel">
-        <div className="dd-view-toggle">
-          <button
-            className={`dd-toggle-btn ${viewMode === "3d" ? "active" : ""}`}
-            onClick={() => setViewMode("3d")}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5Z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
-            3D View
-          </button>
-          <button
-            className={`dd-toggle-btn ${viewMode === "2d" ? "active" : ""}`}
-            onClick={() => setViewMode("2d")}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
-            2D Slices
-          </button>
+        <div className="dd-view-toggle" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              className={`dd-toggle-btn ${viewMode === "3d" ? "active" : ""}`}
+              onClick={() => setViewMode("3d")}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M12 2L2 7l10 5 10-5-10-5Z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+              3D View
+            </button>
+            <button
+              className={`dd-toggle-btn ${viewMode === "2d" ? "active" : ""}`}
+              onClick={() => setViewMode("2d")}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18"/></svg>
+              2D Slices
+            </button>
+          </div>
+          <ReportButton />
         </div>
 
         <div className="dd-viewer-full">
@@ -336,64 +261,63 @@ function ResultsTab() {
             <Viewer tumorMeshUrl={result.mesh_url} brainMeshUrl={result.brain_mesh_url} />
           ) : (
             <div className="dd-slice-center">
-              <SliceViewer sliceInfo={result.slice_info} />
+              <div className="dd-slice-toolbar">
+                <HeatmapControls
+                  available={availableModalities}
+                  enabled={heatmapEnabled}
+                  onToggle={setHeatmapEnabled}
+                  modality={heatmapModality}
+                  onModalityChange={setHeatmapModality}
+                  opacity={heatmapOpacity}
+                  onOpacityChange={setHeatmapOpacity}
+                  uncertainty={heatmapUncertainty}
+                  onUncertaintyChange={setHeatmapUncertainty}
+                />
+                {proximity.length > 0 && (
+                  <button
+                    type="button"
+                    className={`rr-markers-toggle ${showStructureMarkers ? "active" : ""}`}
+                    onClick={() => setShowStructureMarkers((v) => !v)}
+                  >
+                    {showStructureMarkers ? "Hide" : "Show"} critical structures
+                  </button>
+                )}
+              </div>
+              <SliceViewer
+                sliceInfo={result.slice_info}
+                imageOverlay={({ axis, sliceIndex }) =>
+                  heatmapEnabled && availableModalities.includes(heatmapModality) ? (
+                    <img
+                      key={`${axis}-${sliceIndex}-${heatmapModality}-${heatmapOpacity}-${heatmapUncertainty}`}
+                      className="heatmap-overlay"
+                      alt={`${heatmapModality} attention heatmap`}
+                      src={`${API_BASE}/api/heatmap/${axis}/${sliceIndex}?modality=${heatmapModality}&opacity=${heatmapOpacity}&palette=${
+                        heatmapUncertainty ? "inferno" : "viridis"
+                      }`}
+                    />
+                  ) : null
+                }
+                overlay={({ axis, sliceIndex, sliceInfo }) => (
+                  <StructureMarkers2D
+                    proximity={proximity}
+                    axis={axis}
+                    sliceIndex={sliceIndex}
+                    sliceInfo={sliceInfo}
+                    visible={showStructureMarkers}
+                  />
+                )}
+              />
+              {heatmapEnabled && (
+                <ReasoningSummaryCard reasoning={heatmapInfo.reasoning} />
+              )}
             </div>
           )}
         </div>
       </div>
 
-      {/* ── Right panel: AI Chat ── */}
+      {/* ── Right panel: AI Validation ── */}
       <div className="dd-right-panel">
-        <div className="dd-chat-panel">
-          <div className="dd-card-header">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
-            </svg>
-            <h3>AI Explanation</h3>
-          </div>
-
-          <div className="dd-chat-messages">
-            {chatMessages.map((msg, i) => (
-              <div key={i} className={`dd-chat-msg dd-chat-${msg.role}`}>
-                {msg.role === "ai" && (
-                  <div className="dd-chat-avatar">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-                  </div>
-                )}
-                <div className="dd-chat-bubble">{msg.text}</div>
-              </div>
-            ))}
-            {chatLoading && (
-              <div className="dd-chat-msg dd-chat-ai">
-                <div className="dd-chat-avatar">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4M12 8h.01"/></svg>
-                </div>
-                <div className="dd-chat-bubble dd-chat-typing">
-                  <span /><span /><span />
-                </div>
-              </div>
-            )}
-            <div ref={chatEndRef} />
-          </div>
-
-          <div className="dd-chat-input-row">
-            <input
-              type="text"
-              className="dd-chat-input"
-              placeholder="Ask about this scan report..."
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={chatLoading}
-            />
-            <button className="dd-chat-send" onClick={handleSend} disabled={!chatInput.trim() || chatLoading}>
-              {chatLoading
-                ? <span className="spinner" style={{ width: 14, height: 14 }} />
-                : <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-              }
-            </button>
-          </div>
-        </div>
+        <AIValidationPanel />
       </div>
     </div>
   );
@@ -407,6 +331,7 @@ function ClinicalTab() {
   const p = result.pipeline;
   const reasoning = result.reasoning || [];
   const riskFactors = m?.risk_factors || [];
+  const proximity = result.anatomical_proximity || [];
 
   return (
     <div className="page results-page">
@@ -444,6 +369,12 @@ function ClinicalTab() {
             </div>
           </div>
         </div>
+
+        {proximity.length > 0 && (
+          <div style={{ marginTop: 18 }}>
+            <RiskRadarPanel proximity={proximity} surgicalNote={result.surgical_note} />
+          </div>
+        )}
 
         <div className="detail-card reasoning-section">
           <h3>Clinical Reasoning</h3>
