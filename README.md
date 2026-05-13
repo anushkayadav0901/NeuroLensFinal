@@ -1,210 +1,229 @@
-# NeuroLens 🧠
+<div align="center">
 
-> Turn a brain MRI scan into an interactive 3D surgical planning view — with separate interfaces for patients and doctors.
+# 🧠 NeuroLens
 
-NeuroLens takes multi-modal MRI data (FLAIR, T1, T1CE, T2), runs it through a 4-level segmentation pipeline (prioritizing a pre-trained **3D Attention-UNet** or **SwinUNETR**), and produces:
+### Brain MRI → 3D insight · clinical reasoning · patient-safe reporting
 
-- A 3D mesh of the detected tumor overlaid on the brain surface
-- Quantified clinical metrics (volume, depth, laterality, region mapping)
-- A step-by-step clinical reasoning trace
-- Two distinct report views — one simplified for patients, one detailed for clinicians
+<p align="center">
+  <img src="https://img.shields.io/badge/FastAPI-0B1220?style=for-the-badge&logo=fastapi&logoColor=38BDF8&labelColor=111827" alt="FastAPI" />
+  <img src="https://img.shields.io/badge/React_18-0B1220?style=for-the-badge&logo=react&logoColor=38BDF8&labelColor=111827" alt="React" />
+  <img src="https://img.shields.io/badge/Vite-0B1220?style=for-the-badge&logo=vite&logoColor=38BDF8&labelColor=111827" alt="Vite" />
+  <img src="https://img.shields.io/badge/Three.js-0B1220?style=for-the-badge&logo=threedotjs&logoColor=38BDF8&labelColor=111827" alt="Three.js" />
+  <img src="https://img.shields.io/badge/Gemini_2.5_Flash-0B1220?style=for-the-badge&logo=googlegemini&logoColor=38BDF8&labelColor=111827" alt="Gemini" />
+</p>
 
-![3D Viewer](https://img.shields.io/badge/3D_Viewer-Three.js-blue?style=flat-square)
-![Model](https://img.shields.io/badge/Model-Keras%2FTensorFlow-orange?style=flat-square)
-![Dice](https://img.shields.io/badge/Dice_Score-0.9562-brightgreen?style=flat-square)
-![Dataset](https://img.shields.io/badge/Dataset-BraTS2021-yellow?style=flat-square)
+<sub>🔬 Research & education prototype — <b>decision support only</b>, not a medical device.</sub>
 
----
-
-## Why NeuroLens?
-
-Most tumor segmentation tools stop at the mask — they give you a numpy array and call it a day. NeuroLens goes further:
-
-- **Patients** shouldn't have to stare at raw medical imaging. They get a clear, reassuring summary of what was found and what happens next.
-- **Doctors** need the technical details — exact volume in cm³, distance from midline, depth from cortical surface, risk factors, and the reasoning behind each conclusion.
-- **Both** can rotate a 3D brain model and visually inspect the tumor's location and extent.
+</div>
 
 ---
 
-## Features
+<h2 id="demo">🎬 Prototype & showcase</h2>
 
-### Upload & Analyze
-- Upload a DICOM zip, NIfTI file, or a BraTS-format multi-modal zip
-- Auto-detects BraTS-style modalities (flair/t1/t1ce/t2) inside zip archives
-- Falls back to single-channel replication for regular scans
-- Browse and analyze any of the 369 BraTS2020 training cases directly
+**Watch the walkthrough (Google Drive):** [▶️ NeuroLens prototype video](https://drive.google.com/file/d/1ONlBuKJN0A5EsGpKo3KHZVGlu-yBi_KL/view?usp=sharing)
 
-### Segmentation Pipeline
-The platform uses a progressive 4-level inference system to guarantee results in any environment:
-- **Level 1 (Pre-segmented Masks):** Instantly loads `.npy` masks if provided.
-- **Level 2 (3D Attention-UNet):** Uses a TensorFlow/Keras model achieving **0.9562 Dice** on BraTS 2021. Requires a 69MB download.
-- **Level 3 (SwinUNETR):** PyTorch/MONAI fallback (62M parameters, 0.9211 Dice).
-- **Level 4 (Heuristic):** Intensity-based thresholding fallback when no ML models are available.
-
-### 3D Visualization
-- Full brain surface mesh + tumor mesh rendered with Three.js
-- Orbit controls — rotate, zoom, pan
-- Proper depth rendering (tumor always visible through transparent brain)
-
-### Clinical Output
-- **Region mapping** — maps tumor centroid to brain region (frontal, temporal, parietal, etc.)
-- **Volume estimation** — in cm³ using voxel spacing
-- **Risk assessment** — based on volume, depth, and proximity to critical structures
-- **Reasoning trace** — 6-step chain showing how each conclusion was derived
-- **Dual-view reports** — patient-friendly vs. clinician-grade
-
-### Evaluation
-- Built-in ground truth comparison for BraTS cases
-- Dice coefficient and IoU metrics
-- Validated at **0.9211 Dice** on BraTS20_Training_001
 
 ---
 
-## Architecture
+## 📑 Contents
 
-```
-NeuroLens/
-├── backend/                    # FastAPI server
-│   ├── app/
-│   │   ├── main.py             # CORS, static files, app setup
-│   │   ├── routes/
-│   │   │   └── analyze.py      # /api/analyze, /api/brats-analysis, /api/model-status
-│   │   └── services/
-│   │       ├── segmentor.py    # MONAI model loading + sliding window inference
-│   │       ├── brats_loader.py # Multi-modal NIfTI loading for BraTS cases
-│   │       ├── dicom_loader.py # DICOM/NIfTI/NPY loading + BraTS auto-detection
-│   │       ├── mesh_builder.py # Marching cubes → OBJ mesh generation
-│   │       ├── metrics.py      # Volume, region, depth, risk extraction
-│   │       ├── explainer.py    # Clinical reasoning chain builder
-│   │       ├── postprocessor.py # Morphological cleanup of raw masks
-│   │       ├── evaluator.py    # Dice/IoU against ground truth
-│   │       └── volume_ops.py   # Padding, normalization, axis alignment
-│   └── requirements.txt
-│
-└── frontend/                   # React + Vite
-    ├── index.html
-    └── src/
-        ├── App.jsx             # All views (Upload, 3D Viewer, Patient, Doctor)
-        ├── styles.css          # Full design system
-        └── main.jsx            # Entry point
-```
+- [Prototype & showcase](#demo)
+- [What NeuroLens does](#what-neurolens-does)
+- [Features explained](#features-explained)
+- [Routes (who sees what)](#routes-who-sees-what)
+- [Quick start](#quick-start-run-locally)
+- [Environment variables](#environment-variables)
+- [ML & BraTS (optional)](#ml-brats)
+- [Project layout](#project-layout)
+- [API overview](#api-overview)
+- [Tech stack](#tech-stack)
+- [Acknowledgments](#acknowledgments)
 
 ---
 
-## Getting Started
+## 🎯 What NeuroLens does
 
-### Prerequisites
+NeuroLens is a **full-stack demo** for exploring brain MRI: you upload a study (or use bundled / BraTS data), the backend runs **segmentation and metrics**, and the browser shows **3D meshes**, **2D slices**, **clinical-style fields**, and **AI-assisted review** — all in one cohesive workflow.
 
-- Python 3.9+
-- Node.js 18+
-- (Optional) NVIDIA GPU with CUDA for fast inference
+**Why it exists:** to make tumor context **visible** (volume, shape, location), **explainable** (heatmaps, reasoning snippets), and **discussable** (Gemini-powered validation chat for doctors, patient-friendly summaries, optional voice for busy hands). Nothing here replaces a radiologist or a certified device; it is a **sandbox for teaching, portfolios, and research UI**.
 
-### Backend
+---
+
+## ✨ Features explained
+
+### 🏠 Landing & story
+
+The public landing page sets the tone: hero, short product narrative, and **interactive teasers** (risk, anatomy, chat-style demos) so a visitor understands what NeuroLens tries to solve before they sign in. Scroll-driven sections keep it readable on long reads.
+
+### 👩‍⚕️ Doctor hub
+
+Clinicians land on a **gate + hub**: they can start a new study or open **saved work**. Studies you care about persist **locally** (today’s list + history), so demos survive refresh without a full backend account system.
+
+### 📤 Upload flow
+
+Upload is intentionally **one job**: drop a zip / NIfTI-style volume (or multimodal BraTS zip), hit **Analyze**, and wait for the pipeline. When analysis finishes, you are routed straight into **Review** so the first screen is always the 3D + AI context, not a maze of menus.
+
+### 🔬 Review (results)
+
+**Review** is the “single pane of glass” for the heavy lifting: a **Three.js** 3D viewer of brain + tumor meshes, side by side with the **AI validation** panel (Gemini 2.5 Flash, JSON-shaped answers). From here you can kick off **report preview / export** without losing the viewport — the shell stays **locked** so the 3D context does not jump away mid-thought.
+
+### 🏥 Clinical workspace
+
+**Clinical** opens when you need **surgery-adjacent storytelling**: textual summaries, **anatomical risk radar** (proximity to critical structures when atlas data is available), planning cards, **2D slice navigation**, and the **heatmap workspace** where the API exposes attention-style overlays. A short **heatmap rationale** from the backend helps connect pixels to words.
+
+### 🤝 Patient view
+
+After a doctor has run an analysis, **Patient** offers a calmer, non-jargon summary of the same underlying result — useful for **education** and “what we found” conversations, still clearly framed as non-diagnostic.
+
+### 📚 Learning mode
+
+**Learning** ties into **BraTS-style cases**: browse cases, walk through steps, earn **XP / badges** stored locally. Good for workshops and self-paced practice without shipping a separate LMS.
+
+### 🎤 Voice (optional)
+
+**Voice hints** wire optional speech recognition for **hands-busy demos** — navigate or trigger simple actions where the browser allows it.
+
+### 🧩 Under the hood (pipeline)
+
+Segmentation tries the **best path first** (e.g. pre-supplied mask or a loaded Keras / MONAI model), then falls back to **heuristics** so a conference laptop always gets a mesh and numbers. Offline benchmark numbers in older docs are **R&D context**, not regulatory claims.
+
+---
+
+## 🗺️ Routes (who sees what)
+
+| Path | Who / what |
+|------|------------|
+| `/` | Public landing + product story |
+| `/doctor` | Doctor hub — sign-in, start study, saved reports |
+| `/doctor/study/upload` | Upload only |
+| `/doctor/study/results` | **Review** — 3D + AI chat |
+| `/doctor/study/clinical` | Full **Clinical** workspace |
+| `/patient` | Patient-facing summary |
+| `/learn` | Learning mode |
+
+Legacy redirects: `/doctor/results` and `/doctor/clinical` → nested `study` routes above.
+
+---
+
+## 🚀 Quick start (run locally)
+
+**You need:** Python 3.9+ · Node.js 18+ · Git
+
+**Backend**
 
 ```bash
 cd backend
+python -m venv .venv
+# Windows:  .venv\Scripts\activate
+# Unix:     source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-The API runs on `http://127.0.0.1:8000`.
+- API: `http://127.0.0.1:8000`
+- Health: `http://127.0.0.1:8000/health`
 
-### Frontend
+**Frontend**
 
 ```bash
 cd frontend
 npm install
+cp .env.example .env   # set VITE_API_BASE_URL (+ optional VITE_GEMINI_API_KEY)
 npm run dev
 ```
 
-Opens on `http://127.0.0.1:5173`.
+- App: `http://127.0.0.1:5173`
 
-### Model Setup
+**Production build:** `cd frontend && npm run build` then `npm run preview` if you want to check `dist/`.
 
-NeuroLens uses a flexible multi-level inference system. By default, it runs an intensity-based **heuristic fallback**, which means it works instantly out-of-the-box for hackathon demos.
+**One-liners:** `pip install -r backend/requirements.txt` · `cd backend && uvicorn app.main:app --reload` · `cd frontend && npm install` · `cd frontend && npm run dev`
 
-However, to use the high-accuracy deep learning models, follow these steps:
+---
 
-#### Mode 1 — Keras 3D Attention-UNet (Recommended)
-This model achieves a 0.9562 Dice score and only requires TensorFlow. We've included a script to grab the 69MB weights directly from HuggingFace.
+## 🔐 Environment variables
+
+**`frontend/.env`** (copy from `frontend/.env.example`)
+
+| Variable | Example | Purpose |
+|----------|---------|---------|
+| `VITE_API_BASE_URL` | `http://127.0.0.1:8000` | FastAPI base URL |
+| `VITE_GEMINI_API_KEY` | from Google AI Studio | AI validation (Gemini 2.5 Flash); optional |
+
+**`backend/.env`** (optional)
+
+| Variable | Purpose |
+|----------|---------|
+| `NEUROLENS_KERAS_MODEL_PATH` | After `python download_model.py` |
+| `NEUROLENS_MODEL_PATH` | PyTorch / MONAI `.pt` |
+| `NEUROLENS_BRATS_ROOT` | Local BraTS tree for cases + analysis |
+
+If none are set, the app uses **heuristic** segmentation so demos still run.
+
+---
+
+<h2 id="ml-brats">🧪 Optional: ML models & BraTS</h2>
 
 ```bash
 cd backend
 python download_model.py
-```
-This automatically downloads and extracts the model. It will print an environment variable like:
-`NEUROLENS_KERAS_MODEL_PATH=C:/.../backend/models/3d_attention_unet`
-Add that exact line to your `backend/.env` file.
-
-#### Mode 2 — MONAI SwinUNETR (PyTorch Alternative)
-If you prefer PyTorch and have a `.pt` SwinUNETR checkpoint:
-1. Place the weights somewhere on your disk.
-2. Edit `backend/.env` and set:
-```bash
-NEUROLENS_MODEL_PATH=/absolute/path/to/swinunetr.pt
+# Put the printed NEUROLENS_KERAS_MODEL_PATH into backend/.env
 ```
 
-#### Mode 3 — No Model (Zero Setup)
-Skip all the above. If no environment variables are found, NeuroLens silently falls back to **Level 4 Heuristic Inference** — a fast, algorithmic approximation so the UI and 3D viewer still work perfectly for live demonstrations.
-
-### BraTS Dataset (optional)
-
-```bash
-# Point to a local BraTS2020 dataset (contains BraTS20_Training_XXX folders)
-NEUROLENS_BRATS_ROOT=/path/to/MICCAI_BraTS2020_TrainingData
+```env
+NEUROLENS_BRATS_ROOT=C:/path/to/MICCAI_BraTS2020_TrainingData
 ```
 
-## Running on Google Colab
+---
 
-If you don't have an NVIDIA GPU locally, you can validate the model on Colab:
+## 📁 Project layout
 
-1. Upload `model.pt` and one BraTS case folder to Google Drive
-2. Use a T4 GPU runtime
-3. Install dependencies: `pip install monai nibabel matplotlib`
-4. Load all 4 modalities, run sliding window inference
-5. We validated **0.9211 Dice** in 14.3 seconds on a T4
+```text
+NeuroLensFinal/
+├── backend/app/          # FastAPI — main, routes, services
+├── backend/requirements.txt
+├── backend/download_model.py
+├── frontend/src/         # React — pages, components, features
+├── frontend/package.json
+├── frontend/.env.example
+├── docs/screenshots/
+└── README.md
+```
 
 ---
 
-## Tech Stack
+## 🔌 API overview
 
-| Layer | Tech |
-|---|---|
-| Frontend | React 18, Vite, Three.js |
-| Backend | FastAPI, Uvicorn |
-| Deep Learning | TensorFlow / Keras / PyTorch (MONAI) |
-| 3D Rendering | Three.js + ACESFilmicToneMapping + Glass shaders |
-| Mesh Generation | scikit-image marching cubes → PyWavefront OBJ |
-| Dataset | BraTS 2021 / 2020 |
+Base: **`/api/...`** · Reports: **`/api/reports/...`**
 
----
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/analyze` | Upload → analysis + meshes |
+| `GET` | `/api/sample-analysis` | Bundled sample |
+| `GET` | `/api/brats-cases` | List BraTS IDs |
+| `GET` | `/api/brats-analysis/{id}` | One case |
+| `GET` | `/api/brats-evaluate/{id}` | vs GT when available |
+| `GET` | `/api/model-status` | Active model tier |
+| `GET` | `/api/slice-info` | 2D navigator meta |
+| `GET` | `/api/slices/{axis}/{index}` | Slice PNG |
+| `GET` | `/api/heatmap/{axis}/{index}` | Heatmap tile |
+| `GET` | `/api/heatmap-reasoning` | Rationale JSON |
+| `GET` | `/api/learning/cases` | Learning metadata |
+| `POST` | `/api/reports/validate-report` | Report validation |
+| `GET` | `/api/reports/list-reports` | Reports list *(if configured)* |
 
-| Variable | Default | Description |
-|---|---|---|
-| `NEUROLENS_KERAS_MODEL_PATH` | (empty) | Path to extracted 3D Attention-UNet folder |
-| `NEUROLENS_MODEL_PATH` | (empty) | Path to SwinUNETR model.pt checkpoint |
-| `NEUROLENS_BRATS_ROOT` | (empty) | Path to BraTS training data |
-
-## API Endpoints
-
-| Method | Route | What it does |
-|---|---|---|
-| `POST` | `/api/analyze` | Upload & analyze a scan file |
-| `GET` | `/api/sample-analysis` | Run analysis on built-in sample data |
-| `GET` | `/api/brats-analysis/{case_id}` | Analyze a local BraTS training case |
-| `GET` | `/api/brats-cases` | List available BraTS cases |
-| `GET` | `/api/model-status` | Check if model is loaded and ready |
+Shapes match `AppContext.jsx` and the route modules.
 
 ---
 
-## Acknowledgments
+## 🛠️ Tech stack
 
-- [MONAI](https://monai.io/) for the SwinUNETR architecture and medical imaging utilities
-- [BraTS Challenge](https://www.med.upenn.edu/cbica/brats2020/) for the training dataset
-- [Three.js](https://threejs.org/) for 3D rendering in the browser
+- **Frontend:** React 18, React Router 7, Vite 5, Three.js, html2pdf / jsPDF / html2canvas  
+- **Backend:** FastAPI, Uvicorn, NumPy, NiBabel, pydicom, scikit-image, SciPy  
+- **AI:** Google Generative Language API — Gemini 2.5 Flash + JSON schema  
+- **Demo state:** `localStorage` / `sessionStorage`
 
 ---
 
-## License
+## 🙏 Acknowledgments
 
-This project was built for a hackathon. Feel free to use, modify, and build on top of it.
+BraTS community · Three.js · FastAPI · Vite · [Google AI Studio](https://aistudio.google.com/) for Gemini API keys used in the validation panel.
