@@ -1,341 +1,248 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState } from "react";
+import "./clinical-chat.css";
+
+const REGIONS = ["Left Frontal", "Right Temporal", "Cerebellum", "Brain Stem", "Parietal"];
+const TUMOR_TYPES = ["Glioblastoma", "Meningioma", "Astrocytoma"];
+
+function typeShort(tumorType) {
+  if (tumorType === "Glioblastoma") return "GBM";
+  if (tumorType === "Meningioma") return "MNG";
+  return "AST";
+}
+
+function makeCaseId(location, age) {
+  const slug = location.replace(/\s+/g, "").slice(0, 4).toUpperCase();
+  return `NL-Demo-${slug}-${age}`;
+}
+
+function computeInfiltrationPct({ tumorType, sizeCm, age }) {
+  let v = 34 + (sizeCm - 1) * 7;
+  if (tumorType === "Glioblastoma") v += 20;
+  else if (tumorType === "Astrocytoma") v += 10;
+  else v += 4;
+  if (age >= 65) v += 4;
+  return Math.min(94, Math.max(26, Math.round(v)));
+}
+
+function buildResponses(c) {
+  const { location, tumorType, typeShort: ts, size, infiltrationPct, age } = c;
+  return {
+    location: `The tumor is located in the ${location} region, specifically at coordinates approximately 45mm lateral, 25mm anterior, and 30mm superior to the AC-PC line. The lesion shows infiltrative margins extending into the surrounding white matter tracts. Based on T1CE imaging, the enhancing portion measures ${size} with additional FLAIR hyperintensity suggesting peritumoral edema extending 1.2–1.5cm beyond the enhancing margin.`,
+
+    functions: `Given the ${location} location, the following functions are at risk:\n\n• Motor control: proximity to the precentral gyrus can place primary motor cortex at risk, particularly hand and facial motor control\n• Speech production: Broca's area (BA 44/45) may be within a few centimeters of the tumor margin — expressive aphasia is a consideration when frontal\n• Executive function: dorsolateral prefrontal involvement may impact working memory, planning, and cognitive flexibility\n• Supplementary motor area: risk of transient mutism and motor planning deficits after resection\n\nRecommendation: Awake craniotomy with intraoperative language mapping and motor monitoring should be considered when anatomy is eloquent.`,
+
+    infiltration: `The infiltration score of ${infiltrationPct}% indicates ${infiltrationPct >= 70 ? "a highly invasive" : infiltrationPct >= 50 ? "a moderately invasive" : "a comparatively focal"} pattern relative to the enhancing core. This demo metric is synthesized from:\n\n• DTI tractography patterns (disruption vs displacement of white matter tracts)\n• FLAIR signal abnormality extent beyond T1CE enhancement\n• Perfusion MRI patterns in the peritumoral rim\n• DWI signal in non-enhancing regions\n\nClinical implication: gross total resection may be limited by function when infiltration is high. Molecular markers (IDH, MGMT) and ${tumorType} biology guide adjuvant therapy intensity.`,
+
+    imaging: `Recommended pre-operative imaging protocol:\n\n1. Structural MRI:\n   • 3D T1 MPRAGE pre/post gadolinium (1mm isotropic)\n   • 3D T2-FLAIR (1mm isotropic)\n   • T2-weighted axial\n\n2. Functional imaging:\n   • fMRI: language paradigm (verb generation, picture naming)\n   • fMRI: motor mapping (hand/foot movement)\n   • DTI: 64-direction minimum for tractography\n\n3. Advanced sequences:\n   • MR spectroscopy: Cho/NAA ratio, lactate peak\n   • Perfusion (DSC): rCBV mapping\n   • DWI/ADC: cellularity assessment\n\n4. Surgical planning:\n   • Neuronavigation protocol with fiducial markers\n   • Vessel imaging (MRA/MRV) if near major vessels\n\nAcquire within 48 hours of surgery when feasible and load into neuronavigation.`,
+
+    approach: `Surgical approach options for ${location} (${ts}):\n\n1. Awake craniotomy (often preferred for eloquent cortex):\n   • Real-time language and motor mapping\n   • Supine positioning with controlled head rotation\n   • Cortical and subcortical stimulation during resection\n\n2. Asleep craniotomy with neuromonitoring:\n   • Motor evoked potentials (MEPs) and SSEPs\n   • Language testing limitations vs awake mapping\n\n3. Stereotactic biopsy:\n   • When resection risk outweighs benefit\n   • Tissue for molecular profiling with minimal morbidity\n\nFor this demo case (${size}, age ${age}), coordinate with neuroanesthesia and speech pathology if awake surgery is planned.`,
+  };
+}
+
+const defaultDraft = () => ({
+  location: "Left Frontal",
+  tumorType: "Glioblastoma",
+  sizeCm: 4.1,
+  age: 54,
+});
+
+function draftToActive(d) {
+  const infiltrationPct = computeInfiltrationPct(d);
+  return {
+    ...d,
+    id: makeCaseId(d.location, d.age),
+    typeShort: typeShort(d.tumorType),
+    size: `${d.sizeCm.toFixed(1)}cm`,
+    infiltrationPct,
+  };
+}
 
 /**
  * FEATURE 4 — AI Clinical Chat Demo
- * Simulated clinical assistant with pre-written intelligent responses
- * Multiple case scenarios with quick-prompt buttons
+ * Case is defined by the visitor; responses follow the active case.
  */
 export default function ClinicalChat() {
+  const [draft, setDraft] = useState(defaultDraft);
+  const [activeCase, setActiveCase] = useState(() => draftToActive(defaultDraft()));
   const [messages, setMessages] = useState([]);
   const [isTyping, setIsTyping] = useState(false);
-  const [currentCaseIndex, setCurrentCaseIndex] = useState(0);
 
-  // Pre-written case scenarios
-  const cases = [
-    {
-      id: "BraTS-Patient-042",
-      type: "GBM",
-      location: "Left Frontal",
-      size: "4.1cm",
-      age: 54,
-    },
-    {
-      id: "BraTS-Patient-089",
-      type: "Meningioma",
-      location: "Right Parietal",
-      size: "2.8cm",
-      age: 67,
-    },
-    {
-      id: "BraTS-Patient-127",
-      type: "Astrocytoma",
-      location: "Cerebellum",
-      size: "3.5cm",
-      age: 41,
-    },
-  ];
+  const responses = useMemo(() => buildResponses(activeCase), [activeCase]);
 
-  const currentCase = cases[currentCaseIndex];
+  const prompts = useMemo(
+    () => [
+      { id: "location", label: "Where exactly is the tumor?" },
+      { id: "functions", label: "What functions are at risk?" },
+      {
+        id: "infiltration",
+        label: `What does infiltration score ${activeCase.infiltrationPct}% mean?`,
+      },
+      { id: "imaging", label: "Recommend pre-op imaging" },
+      { id: "approach", label: "What are the surgical approach options?" },
+    ],
+    [activeCase.id, activeCase.infiltrationPct],
+  );
 
-  // Pre-written intelligent responses for each prompt
-  const responses = {
-    location: `The tumor is located in the ${currentCase.location} region, specifically at coordinates approximately 45mm lateral, 25mm anterior, and 30mm superior to the AC-PC line. The lesion shows infiltrative margins extending into the surrounding white matter tracts. Based on T1CE imaging, the enhancing portion measures ${currentCase.size} with additional FLAIR hyperintensity suggesting peritumoral edema extending 1.2-1.5cm beyond the enhancing margin.`,
-    
-    functions: `Given the ${currentCase.location} location, the following functions are at risk:\n\n• Motor Control: The tumor's proximity to the precentral gyrus places primary motor cortex at risk, particularly hand and facial motor control\n• Speech Production: Broca's area (BA 44/45) is within 8mm of the tumor margin — expressive aphasia is a significant risk\n• Executive Function: Dorsolateral prefrontal involvement may impact working memory, planning, and cognitive flexibility\n• Supplementary Motor Area: Risk of transient mutism and motor planning deficits post-resection\n\nRecommendation: Awake craniotomy with intraoperative language mapping and motor monitoring is strongly advised.`,
-    
-    infiltration: `The infiltration score of 72% indicates a highly invasive tumor with significant extension beyond the visible enhancing margin. This metric is derived from:\n\n• DTI tractography showing disruption of white matter tracts (corpus callosum, superior longitudinal fasciculus)\n• FLAIR signal abnormality extending 15mm beyond T1CE enhancement\n• Perfusion MRI showing elevated rCBV in peritumoral region suggesting tumor infiltration vs pure edema\n• DWI restriction in non-enhancing areas indicating high cellularity\n\nClinical Implication: Gross total resection is unlikely without significant functional deficit. Consider subtotal resection with adjuvant chemoradiation. Molecular markers (IDH, MGMT) will guide prognosis and treatment intensity.`,
-    
-    imaging: `Recommended pre-operative imaging protocol:\n\n1. Structural MRI:\n   • 3D T1 MPRAGE pre/post gadolinium (1mm isotropic)\n   • 3D T2-FLAIR (1mm isotropic)\n   • T2-weighted axial\n\n2. Functional Imaging:\n   • fMRI: language paradigm (verb generation, picture naming)\n   • fMRI: motor mapping (hand/foot movement)\n   • DTI: 64-direction minimum for tractography\n\n3. Advanced Sequences:\n   • MR Spectroscopy: Cho/NAA ratio, lactate peak\n   • Perfusion (DSC): rCBV mapping\n   • DWI/ADC: cellularity assessment\n\n4. Surgical Planning:\n   • Neuronavigation protocol with fiducial markers\n   • Vessel imaging (MRA/MRV) if near major vessels\n\nAll sequences should be acquired within 48 hours of surgery and loaded into neuronavigation system.`,
-    
-    approach: `Surgical approach options for ${currentCase.location} ${currentCase.type}:\n\n1. Awake Craniotomy (RECOMMENDED):\n   • Allows real-time language and motor mapping\n   • Patient positioned supine, head neutral or slight rotation\n   • Cortical and subcortical stimulation during resection\n   • Maximize resection while preserving eloquent cortex\n\n2. Asleep Craniotomy with Neuromonitoring:\n   • If patient unable to tolerate awake procedure\n   • Motor evoked potentials (MEPs)\n   • Somatosensory evoked potentials (SSEPs)\n   • Limited by inability to test language real-time\n\n3. Stereotactic Biopsy:\n   • If tumor deemed unresectable\n   • Tissue diagnosis for molecular profiling\n   • Minimal morbidity but no cytoreductive benefit\n\nRecommended: Option 1 (awake craniotomy) given tumor size and location in eloquent cortex. Coordinate with neuroanesthesia and speech pathology for intraoperative support.`,
+  const applyCase = () => {
+    setActiveCase(draftToActive(draft));
+    setMessages([]);
   };
 
-  // Quick prompt buttons
-  const prompts = [
-    { id: "location", label: "Where exactly is the tumor?" },
-    { id: "functions", label: "What functions are at risk?" },
-    { id: "infiltration", label: "What does infiltration score 72% mean?" },
-    { id: "imaging", label: "Recommend pre-op imaging" },
-    { id: "approach", label: "What are the surgical approach options?" },
-  ];
-
-  // Simulate typing animation
   const typeMessage = (text) => {
     setIsTyping(true);
-    setTimeout(() => {
+    window.setTimeout(() => {
       setMessages((prev) => [...prev, { role: "assistant", text }]);
       setIsTyping(false);
-    }, 1200);
+    }, 900);
   };
 
   const handlePromptClick = (promptId) => {
     const prompt = prompts.find((p) => p.id === promptId);
+    const text = responses[promptId];
+    if (!prompt || !text) return;
     setMessages((prev) => [...prev, { role: "user", text: prompt.label }]);
-    typeMessage(responses[promptId]);
-  };
-
-  const loadNewCase = () => {
-    const nextIndex = (currentCaseIndex + 1) % cases.length;
-    setCurrentCaseIndex(nextIndex);
-    setMessages([]);
+    typeMessage(text);
   };
 
   return (
-    <section style={{ padding: "80px 40px", maxWidth: "1200px", margin: "0 auto" }}>
-      {/* Section Label */}
-      <div style={{
-        display: "inline-block",
-        padding: "4px 12px",
-        borderRadius: "6px",
-        fontSize: "0.7rem",
-        fontWeight: "700",
-        letterSpacing: "0.1em",
-        textTransform: "uppercase",
-        color: "#2DD4BF",
-        background: "rgba(45, 212, 191, 0.08)",
-        border: "1px solid rgba(45, 212, 191, 0.12)",
-        marginBottom: "16px",
-      }}>
-        Feature 4
-      </div>
-
-      <h2 style={{
-        fontSize: "2rem",
-        fontWeight: "700",
-        marginBottom: "12px",
-        color: "#E5E7EB",
-        letterSpacing: "-0.02em",
-      }}>
-        AI Clinical Chat Demo
-      </h2>
-
-      <p style={{
-        fontSize: "1rem",
-        color: "#9CA3AF",
-        marginBottom: "40px",
-        maxWidth: "700px",
-        lineHeight: "1.6",
-      }}>
-        Interact with an AI clinical assistant trained on neurosurgical cases. Ask questions about tumor location, surgical risk, and treatment planning.
+    <section className="cc-section">
+      <div className="cc-badge">Feature 4</div>
+      <h2 className="cc-title">AI Clinical Chat Demo</h2>
+      <p className="cc-lede">
+        Build a synthetic case below, apply it to the assistant, then use the clinical prompts. All
+        answers update to match your selections (demo content, not medical advice).
       </p>
 
-      {/* Chat Container */}
-      <div style={{
-        background: "#111827",
-        border: "1px solid #1F2937",
-        borderRadius: "12px",
-        overflow: "hidden",
-      }}>
-        {/* Case Context Header */}
-        <div style={{
-          padding: "20px 24px",
-          background: "#0B1220",
-          borderBottom: "1px solid #1F2937",
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "center",
-        }}>
-          <div style={{
-            fontFamily: "monospace",
-            fontSize: "0.85rem",
-            color: "#2DD4BF",
-          }}>
-            <span style={{ color: "#6B7280" }}>Case:</span> {currentCase.id} · 
-            <span style={{ color: "#6B7280" }}> Type:</span> {currentCase.type} · 
-            <span style={{ color: "#6B7280" }}> Location:</span> {currentCase.location} · 
-            <span style={{ color: "#6B7280" }}> Size:</span> {currentCase.size} · 
-            <span style={{ color: "#6B7280" }}> Age:</span> {currentCase.age}
+      <div className="cc-shell">
+        <div className="cc-builder">
+          <p className="cc-builder-title">Build your case</p>
+          <div className="cc-builder-grid">
+            <div className="cc-field">
+              <label htmlFor="cc-region">Tumor region</label>
+              <select
+                id="cc-region"
+                value={draft.location}
+                onChange={(e) => setDraft((d) => ({ ...d, location: e.target.value }))}
+              >
+                {REGIONS.map((r) => (
+                  <option key={r} value={r}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="cc-field">
+              <label htmlFor="cc-type">Tumor type</label>
+              <select
+                id="cc-type"
+                value={draft.tumorType}
+                onChange={(e) => setDraft((d) => ({ ...d, tumorType: e.target.value }))}
+              >
+                {TUMOR_TYPES.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="cc-field">
+              <label htmlFor="cc-size">Enhancing size (cm)</label>
+              <input
+                id="cc-size"
+                type="number"
+                min={1}
+                max={6}
+                step={0.1}
+                value={draft.sizeCm}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    sizeCm: Math.min(6, Math.max(1, parseFloat(e.target.value) || 1)),
+                  }))
+                }
+              />
+              <div className="cc-field-hint">1.0 – 6.0 cm</div>
+            </div>
+            <div className="cc-field">
+              <label htmlFor="cc-age">Patient age</label>
+              <input
+                id="cc-age"
+                type="number"
+                min={18}
+                max={95}
+                step={1}
+                value={draft.age}
+                onChange={(e) =>
+                  setDraft((d) => ({
+                    ...d,
+                    age: Math.min(95, Math.max(18, parseInt(e.target.value, 10) || 18)),
+                  }))
+                }
+              />
+            </div>
+            <button type="button" className="cc-apply" onClick={applyCase}>
+              Apply case & reset chat
+            </button>
           </div>
-          <button
-            onClick={loadNewCase}
-            style={{
-              padding: "6px 14px",
-              borderRadius: "6px",
-              border: "1px solid #1F2937",
-              background: "transparent",
-              color: "#9CA3AF",
-              fontSize: "0.8rem",
-              fontWeight: "600",
-              cursor: "pointer",
-              transition: "all 0.2s ease",
-            }}
-            onMouseOver={(e) => {
-              e.target.style.borderColor = "#2DD4BF";
-              e.target.style.color = "#2DD4BF";
-            }}
-            onMouseOut={(e) => {
-              e.target.style.borderColor = "#1F2937";
-              e.target.style.color = "#9CA3AF";
-            }}
-          >
-            Ask Another Case
-          </button>
         </div>
 
-        {/* Chat Messages Area */}
-        <div style={{
-          padding: "24px",
-          minHeight: "400px",
-          maxHeight: "500px",
-          overflowY: "auto",
-          display: "flex",
-          flexDirection: "column",
-          gap: "16px",
-        }}>
+        <div className="cc-meta">
+          <div className="cc-meta-row">
+            <span className="dim">Case:</span> {activeCase.id}
+            <span className="dim"> · Type:</span> {activeCase.typeShort} ({activeCase.tumorType})
+            <span className="dim"> · Location:</span> {activeCase.location}
+            <span className="dim"> · Size:</span> {activeCase.size}
+            <span className="dim"> · Age:</span> {activeCase.age}
+            <span className="dim"> · Demo infiltration:</span> {activeCase.infiltrationPct}%
+          </div>
+        </div>
+
+        <div className="cc-scroll">
           {messages.length === 0 && !isTyping && (
-            <div style={{
-              flex: 1,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              color: "#6B7280",
-              fontSize: "0.9rem",
-              textAlign: "center",
-            }}>
-              Select a question below to start the clinical consultation
+            <div className="cc-empty">
+              Choose parameters above, click &quot;Apply case & reset chat&quot;, then select a
+              question to start.
             </div>
           )}
 
           {messages.map((msg, idx) => (
             <div
-              key={idx}
-              style={{
-                display: "flex",
-                flexDirection: "column",
-                gap: "6px",
-                alignItems: msg.role === "user" ? "flex-end" : "flex-start",
-              }}
+              key={`${idx}-${msg.role}-${msg.text.slice(0, 12)}`}
+              className={`cc-msg ${msg.role === "user" ? "cc-msg-user" : ""}`}
             >
-              <div style={{
-                fontSize: "0.7rem",
-                fontWeight: "600",
-                color: "#6B7280",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}>
-                {msg.role === "user" ? "You" : "NeuroLens AI"}
-              </div>
-              <div style={{
-                maxWidth: "85%",
-                padding: "14px 18px",
-                borderRadius: "8px",
-                background: msg.role === "user" ? "#1F2937" : "#0B1220",
-                border: msg.role === "user" ? "1px solid #374151" : "1px solid rgba(45, 212, 191, 0.2)",
-                color: "#E5E7EB",
-                fontSize: "0.9rem",
-                lineHeight: "1.7",
-                fontFamily: msg.role === "assistant" ? "monospace" : "inherit",
-                whiteSpace: "pre-line",
-              }}>
+              <div className="cc-msg-label">{msg.role === "user" ? "You" : "NeuroLens AI"}</div>
+              <div className={`cc-bubble ${msg.role === "user" ? "cc-bubble-user" : "cc-bubble-ai"}`}>
                 {msg.text}
               </div>
             </div>
           ))}
 
           {isTyping && (
-            <div style={{
-              display: "flex",
-              flexDirection: "column",
-              gap: "6px",
-              alignItems: "flex-start",
-            }}>
-              <div style={{
-                fontSize: "0.7rem",
-                fontWeight: "600",
-                color: "#6B7280",
-                textTransform: "uppercase",
-                letterSpacing: "0.05em",
-              }}>
-                NeuroLens AI
-              </div>
-              <div style={{
-                padding: "14px 18px",
-                borderRadius: "8px",
-                background: "#0B1220",
-                border: "1px solid rgba(45, 212, 191, 0.2)",
-                display: "flex",
-                gap: "4px",
-                alignItems: "center",
-              }}>
-                <span style={{
-                  width: "6px",
-                  height: "6px",
-                  borderRadius: "50%",
-                  background: "#2DD4BF",
-                  animation: "blink 1.4s infinite",
-                  animationDelay: "0s",
-                }} />
-                <span style={{
-                  width: "6px",
-                  height: "6px",
-                  borderRadius: "50%",
-                  background: "#2DD4BF",
-                  animation: "blink 1.4s infinite",
-                  animationDelay: "0.2s",
-                }} />
-                <span style={{
-                  width: "6px",
-                  height: "6px",
-                  borderRadius: "50%",
-                  background: "#2DD4BF",
-                  animation: "blink 1.4s infinite",
-                  animationDelay: "0.4s",
-                }} />
+            <div className="cc-msg">
+              <div className="cc-msg-label">NeuroLens AI</div>
+              <div className="cc-typing" aria-live="polite">
+                <span className="cc-dot" />
+                <span className="cc-dot" />
+                <span className="cc-dot" />
               </div>
             </div>
           )}
         </div>
 
-        {/* Quick Prompt Buttons */}
-        <div style={{
-          padding: "20px 24px",
-          background: "#0B1220",
-          borderTop: "1px solid #1F2937",
-          display: "flex",
-          flexWrap: "wrap",
-          gap: "10px",
-        }}>
+        <div className="cc-prompts">
           {prompts.map((prompt) => (
             <button
               key={prompt.id}
+              type="button"
+              className="cc-chip"
               onClick={() => handlePromptClick(prompt.id)}
               disabled={isTyping}
-              style={{
-                padding: "10px 16px",
-                borderRadius: "8px",
-                border: "1px solid #1F2937",
-                background: "#111827",
-                color: "#E5E7EB",
-                fontSize: "0.85rem",
-                fontWeight: "500",
-                cursor: isTyping ? "not-allowed" : "pointer",
-                transition: "all 0.2s ease",
-                opacity: isTyping ? 0.5 : 1,
-              }}
-              onMouseOver={(e) => {
-                if (!isTyping) {
-                  e.target.style.borderColor = "#2DD4BF";
-                  e.target.style.background = "rgba(45, 212, 191, 0.1)";
-                }
-              }}
-              onMouseOut={(e) => {
-                e.target.style.borderColor = "#1F2937";
-                e.target.style.background = "#111827";
-              }}
             >
               {prompt.label}
             </button>
           ))}
         </div>
       </div>
-
-      {/* CSS Animation for typing dots */}
-      <style>{`
-        @keyframes blink {
-          0%, 20%, 100% { opacity: 0.2; }
-          50% { opacity: 1; }
-        }
-      `}</style>
     </section>
   );
 }

@@ -12,7 +12,7 @@
  */
 
 const GEMINI_API_KEY = import.meta.env.VITE_GEMINI_API_KEY || "";
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`;
+const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 const RESPONSE_SCHEMA = {
   type: "object",
@@ -63,6 +63,15 @@ embedded in the NeuroLens brain MRI analysis platform.
 
 YOU ARE NOT A GENERIC CHATBOT. You are a clinical decision-support layer.
 
+BREVITY (required):
+- answer_summary: at most 2 short sentences (under ~220 characters total).
+- primary_finding: one concise clause (under ~120 characters).
+- supporting_observations: at most 3 items; each under ~90 characters.
+- validations: at most 2 short items; each under ~80 characters.
+- anatomical_context: at most 2 short items; each under ~90 characters.
+- limitations: at most 2 short items; each under ~90 characters.
+- confidence fields: each a short phrase (under ~60 characters).
+
 ABSOLUTE RULES:
 1. Only answer questions about brain MRI scans, neuroanatomy of the analyzed
    case, segmentation, or this specific scan's findings.
@@ -86,7 +95,7 @@ ABSOLUTE RULES:
      "anatomical_context": ["string", ...],
      "confidence": { "segmentation": "string", "classification": "string" },
      "limitations": ["string", ...],
-     "answer_summary": "1-3 sentence direct answer to the doctor's question",
+     "answer_summary": "direct answer; max 2 short sentences",
      "out_of_scope_message": "string (only when status=out_of_scope)"
    }
 
@@ -171,8 +180,8 @@ export async function askValidator(messages, result) {
     system_instruction: { parts: [{ text: system }] },
     contents: turnsForGemini,
     generationConfig: {
-      temperature: 0.15,
-      maxOutputTokens: 900,
+      temperature: 0.12,
+      maxOutputTokens: 512,
       responseMimeType: "application/json",
       responseSchema: RESPONSE_SCHEMA,
     },
@@ -244,12 +253,10 @@ export function buildSeedPayload(result) {
   const validations = [
     "Segmentation post-processed (largest connected component retained).",
     "Voxel-volume conversion applied with reported voxel spacing.",
-    "Region mapped via normalized centroid to brain-region atlas.",
-    "Anatomical proximity computed against bundled critical-structure atlas.",
   ];
 
-  const anatomicalContext = proximity.slice(0, 3).map(
-    (p) => `${p.name} proximity: ${p.surface_distance_mm.toFixed(1)} mm (${p.risk_zone}).`,
+  const anatomicalContext = proximity.slice(0, 2).map(
+    (p) => `${p.name}: ${p.surface_distance_mm.toFixed(1)} mm (${p.risk_zone}).`,
   );
 
   const limitations = [
@@ -262,18 +269,16 @@ export function buildSeedPayload(result) {
   return {
     status: "answered",
     primary_finding: `${s.region || "Tumor"} — ${s.risk_level || "Unknown"} risk`,
-    supporting_observations: supporting,
-    validations,
+    supporting_observations: supporting.slice(0, 3),
+    validations: validations.slice(0, 2),
     anatomical_context: anatomicalContext.length
-      ? anatomicalContext
+      ? anatomicalContext.slice(0, 2)
       : ["No proximity data available for the active scan."],
     confidence: {
       segmentation: m.tumor_voxels ? "high (rule-based / supervised)" : "n/a",
       classification: top ? "moderate" : "n/a",
     },
-    limitations,
-    answer_summary: `Initial AI summary for ${s.region || "the analyzed region"}: ${
-      s.volume || "volume n/a"
-    }, ${s.risk_level || "risk n/a"} risk. Ask a follow-up question to drill deeper.`,
+    limitations: limitations.slice(0, 2),
+    answer_summary: `${s.region || "Region"} · ${s.risk_level || "risk n/a"} — ask a focused question for more detail.`,
   };
 }

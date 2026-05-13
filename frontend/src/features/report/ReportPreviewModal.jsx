@@ -17,7 +17,7 @@ import {
 const TODAY_ISO = new Date().toISOString().slice(0, 10);
 
 export default function ReportPreviewModal({ open, onClose }) {
-  const { result } = useApp();
+  const { result, activePatientName } = useApp();
   const { findings, messages, doctorName: vDoctorName } = useValidation();
 
   const [reportId] = useState(generateReportId);
@@ -59,7 +59,11 @@ export default function ReportPreviewModal({ open, onClose }) {
   useEffect(() => {
     if (!open) return;
     setSelectedFindingIds(verifiedFindings.map((f) => f.id));
-    setMetadata((m) => ({ ...m, doctorName: m.doctorName || vDoctorName || "" }));
+    setMetadata((m) => ({
+      ...m,
+      doctorName: m.doctorName || vDoctorName || "",
+      patientName: m.patientName || activePatientName || "",
+    }));
     captureAll();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);

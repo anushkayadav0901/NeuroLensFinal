@@ -1,4 +1,5 @@
 import useReveal from "./useReveal";
+import logoImg from "../../components/logo.png";
 
 const POINTS = [
   "AI does the pixel-level grunt work — segmentation, volumes, asymmetry — in seconds.",
@@ -15,7 +16,7 @@ export default function CognitiveLoadSection() {
           <div className="li-eyebrow">Cognitive load, redistributed</div>
           <h2 className="li-title">Free up the radiologist's mind for the part only humans should do.</h2>
           <p className="li-lede">
-            NeuroLens isn't trying to replace clinicians — it's trying to take 80% of
+            NeuroLens isn&apos;t trying to replace clinicians — it&apos;s trying to take 80% of
             the rote measurement work off their plate so the remaining 20% (the
             judgment) gets the attention it deserves.
           </p>
@@ -29,33 +30,46 @@ export default function CognitiveLoadSection() {
           </ul>
         </div>
         <div className="li-pillar">
-          <div className="li-pillar-row">
-            <div className="li-pillar-label">Today</div>
-            <div className="li-pillar-bar">
-              <div className="li-pillar-fill" style={{ width: "78%", background: "#94A3B8" }} />
-            </div>
-            <div className="li-pillar-val">78% measurement</div>
+          <div className="li-pillar-head">
+            <span className="li-pillar-head-spacer" />
+            <span className="li-pillar-head-label">Today</span>
+            <span className="li-pillar-head-logo">
+              <img src={logoImg} alt="NeuroLens" className="li-pillar-product-logo" />
+            </span>
           </div>
-          <div className="li-pillar-row">
-            <div className="li-pillar-label">With NeuroLens</div>
+
+          <div className="li-pillar-dual">
+            <span className="li-pillar-metric-label">Measurement burden</span>
             <div className="li-pillar-bar">
-              <div className="li-pillar-fill" style={{ width: "22%", background: "#0EA5E9" }} />
+              <div
+                className="li-pillar-fill"
+                style={{ ["--w"]: "78%", background: "#64748b" }}
+              />
             </div>
-            <div className="li-pillar-val">22% measurement</div>
+            <div className="li-pillar-bar">
+              <div
+                className="li-pillar-fill"
+                style={{ ["--w"]: "22%", background: "#2dd4bf" }}
+              />
+            </div>
+            <span className="li-pillar-val">78% vs 22%</span>
           </div>
-          <div className="li-pillar-row">
-            <div className="li-pillar-label">Today</div>
+
+          <div className="li-pillar-dual">
+            <span className="li-pillar-metric-label">Reasoning headroom</span>
             <div className="li-pillar-bar">
-              <div className="li-pillar-fill" style={{ width: "22%", background: "#94A3B8" }} />
+              <div
+                className="li-pillar-fill"
+                style={{ ["--w"]: "22%", background: "#64748b" }}
+              />
             </div>
-            <div className="li-pillar-val">22% reasoning</div>
-          </div>
-          <div className="li-pillar-row">
-            <div className="li-pillar-label">With NeuroLens</div>
             <div className="li-pillar-bar">
-              <div className="li-pillar-fill" style={{ width: "78%", background: "#22C55E" }} />
+              <div
+                className="li-pillar-fill"
+                style={{ ["--w"]: "81%", background: "#22c55e" }}
+              />
             </div>
-            <div className="li-pillar-val">78% reasoning</div>
+            <span className="li-pillar-val">22% vs 81%</span>
           </div>
         </div>
       </div>

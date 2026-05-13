@@ -24,10 +24,10 @@ export default function ValidationBlock({ payload }) {
     );
   }
 
-  const obs = payload.supporting_observations || [];
-  const vals = payload.validations || [];
-  const ctx = payload.anatomical_context || [];
-  const limits = payload.limitations || [];
+  const obs = (payload.supporting_observations || []).slice(0, 3);
+  const vals = (payload.validations || []).slice(0, 2);
+  const ctx = (payload.anatomical_context || []).slice(0, 2);
+  const limits = (payload.limitations || []).slice(0, 2);
   const conf = payload.confidence || {};
 
   return (

@@ -38,7 +38,9 @@ export default function RiskRadarPanel({ proximity = [], surgicalNote = "" }) {
       {!collapsed && (
         <>
           <div className="rr-radar-row">
-            <RiskRadarChart proximity={proximity} />
+            <div className="rr-radar-chart-wrap">
+              <RiskRadarChart proximity={proximity} />
+            </div>
             <div className="rr-legend">
               {Object.keys(RISK_ZONE_LABEL).map((zone) => (
                 <div className="rr-legend-row" key={zone}>

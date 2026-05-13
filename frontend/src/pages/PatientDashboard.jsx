@@ -12,7 +12,7 @@ export default function PatientDashboard() {
 
   if (!hasResults) {
     return (
-      <div className="page results-page">
+      <div className="page results-page app-view-fill">
         <div className="empty-state">
           <p className="empty-title">No scan analyzed yet</p>
           <p className="empty-desc">Run an analysis from the Doctor View first.</p>
@@ -25,7 +25,7 @@ export default function PatientDashboard() {
   }
 
   return (
-    <div className="page results-page">
+    <div className="page results-page app-view-fill">
       <section className="patient-section">
         <div className="patient-hero">
           <span className="tag">{copy.headline}</span>

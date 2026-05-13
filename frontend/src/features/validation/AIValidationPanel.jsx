@@ -52,7 +52,9 @@ export default function AIValidationPanel() {
       const payload = await askValidator(newHistory, result);
       appendAiMessage(payload, text);
     } catch (err) {
-      appendSystemMessage(`Failed to reach NeuroLens AI: ${err.message}`);
+      const raw = err?.message || String(err);
+      const clipped = raw.length > 200 ? `${raw.slice(0, 197)}…` : raw;
+      appendSystemMessage(`AI request failed: ${clipped}`);
     } finally {
       setLoading(false);
     }
@@ -65,21 +67,17 @@ export default function AIValidationPanel() {
     }
   };
 
-  const handleValidate = (findingId) =>
-    setFindingStatus(findingId, FINDING_STATUS.VERIFIED);
-  const handleFlag = (findingId) =>
-    setFindingStatus(findingId, FINDING_STATUS.FLAGGED);
+  const handleValidate = (findingId) => setFindingStatus(findingId, FINDING_STATUS.VERIFIED);
+  const handleFlag = (findingId) => setFindingStatus(findingId, FINDING_STATUS.FLAGGED);
 
   const findingById = (id) => findings.find((f) => f.id === id) || null;
 
   return (
     <div className="vp-root">
-      <div className="vp-header">
+      <div className="vp-header vp-header-compact">
         <div className="vp-title-row">
-          <span className="vp-title">AI Validation</span>
-          <span className="vp-subtitle">
-            Scan-aware reasoning · Doctor-validated findings only enter reports
-          </span>
+          <span className="vp-title">AI validation</span>
+          <span className="vp-subtitle">Validated findings feed the PDF</span>
         </div>
         <div className="vp-doctor-input">
           <label htmlFor="vp-doctor-name">Reviewer</label>
@@ -110,20 +108,20 @@ export default function AIValidationPanel() {
               <span className="cm-sender">NeuroLens AI</span>
             </div>
             <div className="cm-bubble cm-bubble-ai cm-typing">
-              <span /><span /><span />
+              <span />
+              <span />
+              <span />
             </div>
           </div>
         )}
         <div ref={endRef} />
       </div>
 
-      <SuggestedQuestions onPick={(q) => handleSend(q)} disabled={loading} />
-
       <div className="vp-input-row">
-        <input
-          type="text"
-          className="vp-input"
-          placeholder="Ask about this analysis..."
+        <textarea
+          className="vp-input vp-input-multiline"
+          placeholder="Ask about this scan… (Enter to send, Shift+Enter for newline)"
+          rows={2}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
@@ -146,9 +144,9 @@ export default function AIValidationPanel() {
         </button>
       </div>
 
-      <div className="vp-footer">
-        AI assists interpretation. Doctors validate and decide.
-      </div>
+      <SuggestedQuestions onPick={(q) => handleSend(q)} disabled={loading} />
+
+      <div className="vp-footer">AI assists interpretation. Doctors validate and decide.</div>
     </div>
   );
 }

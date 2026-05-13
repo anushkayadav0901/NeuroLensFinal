@@ -1,8 +1,11 @@
 import { useMemo } from "react";
 import { colorForZone } from "./riskColors";
 
+/** Inner drawing diameter; viewBox adds padding so axis labels stay inside the SVG. */
 const SIZE = 280;
-const CENTER = SIZE / 2;
+const VIEW_PAD = 44;
+const VIEW = SIZE + VIEW_PAD * 2;
+const CENTER = VIEW / 2;
 const RING_COUNT = 4;
 const MAX_DISTANCE_MM = 60;
 
@@ -40,7 +43,7 @@ export default function RiskRadarChart({ proximity = [] }) {
     .join(" ");
 
   return (
-    <svg className="rr-radar-svg" viewBox={`0 0 ${SIZE} ${SIZE}`} role="img" aria-label="Risk radar chart">
+    <svg className="rr-radar-svg" viewBox={`0 0 ${VIEW} ${VIEW}`} role="img" aria-label="Risk radar chart">
       <defs>
         <radialGradient id="rr-zones" cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#EF4444" stopOpacity="0.18" />

@@ -224,7 +224,32 @@ const ReportTemplate = forwardRef(function ReportTemplate(props, ref) {
         </div>
       </Section>
 
-      {/* 3. Anatomical Findings */}
+      <Section title="Clinical Impression (Draft for Review)" breakBefore>
+        <p style={{ margin: "0 0 8px", fontSize: 11, lineHeight: 1.55 }}>
+          {[
+            summary.region && `Lesion context: ${summary.region}.`,
+            summary.risk_level && `Pipeline risk band: ${summary.risk_level}.`,
+            metrics.tumor_volume_cm3 != null && `Estimated tumor volume ${metrics.tumor_volume_cm3} cm³.`,
+            metrics.midline_distance_mm != null && `Midline distance ${metrics.midline_distance_mm} mm.`,
+            surgicalNote && `Atlas proximity / planning note: ${surgicalNote}`,
+          ]
+            .filter(Boolean)
+            .join(" ") || "Structured metrics are listed in adjacent sections; add clinician impression in notes."}
+        </p>
+        <p style={{ margin: 0, fontSize: 9.5, color: PALETTE.muted, fontStyle: "italic" }}>
+          Auto-generated synopsis from NeuroLens metrics — must be edited or superseded by the signing clinician.
+        </p>
+      </Section>
+
+      <Section title="Pre-operative Documentation Checklist">
+        <ul style={{ margin: 0, paddingLeft: 18, fontSize: 10.5, lineHeight: 1.55 }}>
+          <li>Image quality &amp; sequence completeness suitable for planning</li>
+          <li>Neuronavigation / stereotaxis dataset export (if applicable)</li>
+          <li>Molecular / pathology correlation when tissue available</li>
+          <li>Multidisciplinary tumor board documentation (if institutional policy)</li>
+          <li>Informed consent discussion aligned with findings below</li>
+        </ul>
+      </Section>
       <Section title="Anatomical Findings">
         <Field label="Tumor volume (cm³)" value={metrics.tumor_volume_cm3} />
         <Field label="Region function" value={metrics.region_function} />

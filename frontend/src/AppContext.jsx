@@ -1,4 +1,11 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useState } from "react";
+import {
+  doctorLogin as sessionDoctorLogin,
+  doctorLogout as sessionDoctorLogout,
+  isDoctorAuthenticated,
+  loadDoctorReport,
+  saveDoctorReport,
+} from "./services/doctorSession";
 
 export const API_BASE = (import.meta.env.VITE_API_BASE_URL || "http://127.0.0.1:8000").replace(/\/$/, "");
 
@@ -21,7 +28,23 @@ export const PATIENT_COPY = {
   },
 };
 
+const EMPTY_RESULT = {
+  summary: {},
+  metrics: {},
+  reasoning: [],
+  pipeline: {},
+  input_metadata: {},
+  mesh_url: null,
+  brain_mesh_url: null,
+  slice_info: null,
+  anatomical_proximity: [],
+  surgical_note: "",
+  heatmap: { modalities: [], reasoning: null },
+};
+
 const AppContext = createContext(null);
+
+const PATIENT_NAME_KEY = "nl_active_patient_name";
 
 export function AppProvider({ children }) {
   const [selectedFile, setSelectedFile] = useState(null);
@@ -33,15 +56,15 @@ export function AppProvider({ children }) {
   const [loadingCases, setLoadingCases] = useState(false);
   const [modelStatus, setModelStatus] = useState(null);
   const [status, setStatus] = useState({ text: "Ready", kind: "idle" });
-  const [result, setResult] = useState({
-    summary: {}, metrics: {}, reasoning: [], pipeline: {},
-    input_metadata: {}, mesh_url: null, brain_mesh_url: null, slice_info: null,
-    anatomical_proximity: [], surgical_note: "", heatmap: { modalities: [], reasoning: null },
-  });
+  const [result, setResult] = useState(EMPTY_RESULT);
+  const [doctorAuthed, setDoctorAuthed] = useState(() => isDoctorAuthenticated());
+  const [activePatientName, setActivePatientName] = useState(
+    () => sessionStorage.getItem(PATIENT_NAME_KEY) || "",
+  );
 
   const hasResults = Boolean(result.mesh_url);
 
-  const handleResult = (data) => {
+  const handleResult = useCallback((data) => {
     setResult({
       summary: data.summary || {},
       metrics: data.metrics || {},
@@ -55,7 +78,67 @@ export function AppProvider({ children }) {
       surgical_note: data.surgical_note || "",
       heatmap: data.heatmap || { modalities: [], reasoning: null },
     });
-  };
+  }, []);
+
+  const resetAnalysisState = useCallback(() => {
+    setResult(EMPTY_RESULT);
+    setSelectedFile(null);
+    setStatus({ text: "Ready", kind: "idle" });
+  }, []);
+
+  const loginDoctor = useCallback(() => {
+    sessionDoctorLogin();
+    setDoctorAuthed(true);
+  }, []);
+
+  const logoutDoctor = useCallback(() => {
+    sessionDoctorLogout();
+    setDoctorAuthed(false);
+    setActivePatientName("");
+    resetAnalysisState();
+  }, [resetAnalysisState]);
+
+  const beginPatientStudy = useCallback(
+    (name) => {
+      const trimmed = (name || "").trim();
+      if (!trimmed) return false;
+      setActivePatientName(trimmed);
+      sessionStorage.setItem(PATIENT_NAME_KEY, trimmed);
+      resetAnalysisState();
+      return true;
+    },
+    [resetAnalysisState],
+  );
+
+  const endPatientStudy = useCallback(() => {
+    sessionStorage.removeItem(PATIENT_NAME_KEY);
+    setActivePatientName("");
+    resetAnalysisState();
+  }, [resetAnalysisState]);
+
+  const loadPersistedStudy = useCallback(
+    (meta) => {
+      if (!meta?.id) return false;
+      const data = loadDoctorReport(meta.id);
+      if (!data?.mesh_url) return false;
+      handleResult(data);
+      const name = meta.patientName || sessionStorage.getItem(PATIENT_NAME_KEY) || "";
+      if (name) {
+        setActivePatientName(name);
+        sessionStorage.setItem(PATIENT_NAME_KEY, name);
+      }
+      return true;
+    },
+    [handleResult],
+  );
+
+  const persistCompletedAnalysis = useCallback(
+    (data) => {
+      const name = sessionStorage.getItem(PATIENT_NAME_KEY) || activePatientName;
+      if (name) saveDoctorReport({ patientName: name, result: data });
+    },
+    [activePatientName],
+  );
 
   const runAnalysis = async (useSample) => {
     setRunning(true);
@@ -73,6 +156,7 @@ export function AppProvider({ children }) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "Analysis failed");
       handleResult(data);
+      persistCompletedAnalysis(data);
       setStatus({ text: "Analysis complete.", kind: "success" });
       return true;
     } catch (error) {
@@ -123,6 +207,7 @@ export function AppProvider({ children }) {
       const data = await response.json();
       if (!response.ok) throw new Error(data.detail || "BraTS analysis failed");
       handleResult(data);
+      persistCompletedAnalysis(data);
       setStatus({ text: `Case ${selectedCaseId} analyzed.`, kind: "success" });
       return true;
     } catch (error) {
@@ -140,15 +225,35 @@ export function AppProvider({ children }) {
   }, []);
 
   return (
-    <AppContext.Provider value={{
-      selectedFile, setSelectedFile,
-      bratsCases, selectedCaseId, setSelectedCaseId,
-      selectedModality, setSelectedModality,
-      selectedSource, setSelectedSource,
-      running, loadingCases, modelStatus, status,
-      result, hasResults,
-      runAnalysis, runBratsCase, loadBratsCases,
-    }}>
+    <AppContext.Provider
+      value={{
+        selectedFile,
+        setSelectedFile,
+        bratsCases,
+        selectedCaseId,
+        setSelectedCaseId,
+        selectedModality,
+        setSelectedModality,
+        selectedSource,
+        setSelectedSource,
+        running,
+        loadingCases,
+        modelStatus,
+        status,
+        result,
+        hasResults,
+        runAnalysis,
+        runBratsCase,
+        loadBratsCases,
+        doctorAuthed,
+        loginDoctor,
+        logoutDoctor,
+        activePatientName,
+        beginPatientStudy,
+        endPatientStudy,
+        loadPersistedStudy,
+      }}
+    >
       {children}
     </AppContext.Provider>
   );

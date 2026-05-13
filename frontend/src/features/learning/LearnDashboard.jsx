@@ -11,7 +11,7 @@ function LearnInner() {
   const earnedBadges = badgeDefinitions.filter((b) => badges.includes(b.id));
 
   return (
-    <div className="learn-page">
+    <div className="learn-page app-view-fill">
       <header className="learn-hero">
         <div>
           <div className="learn-eyebrow">Learning Mode</div>

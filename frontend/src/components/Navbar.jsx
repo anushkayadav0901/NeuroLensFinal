@@ -7,12 +7,14 @@ import ReportButton from "../features/report/ReportButton";
 export default function Navbar() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { hasResults, modelStatus } = useApp();
+  const { hasResults, modelStatus, doctorAuthed } = useApp();
   const path = location.pathname;
 
   if (path === "/") {
     return null;
   }
+
+  const inDoctorStudy = path.startsWith("/doctor/study");
 
   return (
     <nav className="navbar">
@@ -21,39 +23,53 @@ export default function Navbar() {
         NeuroLens
       </div>
       <div className="nav-links">
-        <button
-          className={`nav-link ${path === "/doctor" || path === "/doctor/upload" ? "active" : ""}`}
-          onClick={() => navigate("/doctor")}
-        >
-          Upload
-        </button>
-        {hasResults && (
+        {inDoctorStudy ? (
           <>
             <button
-              className={`nav-link ${path === "/doctor/results" ? "active" : ""}`}
-              onClick={() => navigate("/doctor/results")}
+              className={`nav-link ${path.includes("/study/upload") ? "active" : ""}`}
+              onClick={() => navigate("/doctor/study/upload")}
             >
-              3D Viewer
+              Upload
             </button>
             <button
-              className={`nav-link ${path === "/patient" ? "active" : ""}`}
-              onClick={() => navigate("/patient")}
+              className={`nav-link ${path.includes("/study/results") ? "active" : ""}`}
+              disabled={!hasResults}
+              onClick={() => navigate("/doctor/study/results")}
             >
-              Patient View
+              Review
             </button>
             <button
-              className={`nav-link ${path === "/doctor/clinical" ? "active" : ""}`}
-              onClick={() => navigate("/doctor/clinical")}
+              className={`nav-link ${path.includes("/study/clinical") ? "active" : ""}`}
+              disabled={!hasResults}
+              onClick={() => navigate("/doctor/study/clinical")}
             >
-              Doctor View
+              Clinical
+            </button>
+            <button className="nav-link" type="button" onClick={() => navigate("/doctor")}>
+              Hub
             </button>
           </>
+        ) : (
+          <button
+            className={`nav-link ${path.startsWith("/doctor") ? "active" : ""}`}
+            onClick={() => navigate("/doctor")}
+          >
+            Doctor
+          </button>
+        )}
+        {hasResults && (
+          <button
+            className={`nav-link ${path === "/patient" ? "active" : ""}`}
+            onClick={() => navigate("/patient")}
+          >
+            Patient view
+          </button>
         )}
         <button
           className={`nav-link ${path.startsWith("/learn") ? "active" : ""}`}
           onClick={() => navigate("/learn")}
         >
-          Learning Mode
+          Learning mode
         </button>
       </div>
       <div className="nav-status">

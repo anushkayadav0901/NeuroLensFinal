@@ -220,19 +220,13 @@ export default function RiskEstimator() {
             </label>
             <input
               type="range"
+              className="nl-range"
               min="1"
               max="6"
               step="0.1"
               value={size}
               onChange={(e) => setSize(parseFloat(e.target.value))}
-              style={{
-                width: "100%",
-                height: "6px",
-                borderRadius: "3px",
-                background: "#1F2937",
-                outline: "none",
-                cursor: "pointer",
-              }}
+              style={{ "--nl-range-pct": `${((size - 1) / 5) * 100}%` }}
             />
             <div style={{
               display: "flex",
@@ -259,19 +253,13 @@ export default function RiskEstimator() {
             </label>
             <input
               type="range"
+              className="nl-range"
               min="20"
               max="80"
               step="1"
               value={age}
-              onChange={(e) => setAge(parseInt(e.target.value))}
-              style={{
-                width: "100%",
-                height: "6px",
-                borderRadius: "3px",
-                background: "#1F2937",
-                outline: "none",
-                cursor: "pointer",
-              }}
+              onChange={(e) => setAge(parseInt(e.target.value, 10))}
+              style={{ "--nl-range-pct": `${((age - 20) / 60) * 100}%` }}
             />
             <div style={{
               display: "flex",
@@ -343,7 +331,10 @@ export default function RiskEstimator() {
         </div>
 
         {/* Right Column - Results */}
-        <div style={{
+        <div
+          className={result ? "re-result-pane" : undefined}
+          key={result ? result.riskLevel : "empty"}
+          style={{
           background: "#0B1220",
           borderRadius: "8px",
           padding: "24px",

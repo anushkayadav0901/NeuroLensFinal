@@ -13,10 +13,12 @@ import ExplainableAI from "../features/landing-info/ExplainableAI";
 import BeforeAfter from "../features/landing-info/BeforeAfter";
 import MBBSLearning from "../features/landing-info/MBBSLearning";
 import FinalCTA from "../features/landing-info/FinalCTA";
+import useReveal from "../features/landing-info/useReveal";
 import "../features/landing-info/landing-info.css";
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const [featuresBandRef, featuresBandRevealed] = useReveal({ threshold: 0.12 });
 
   return (
     <SessionProvider>
@@ -28,7 +30,6 @@ export default function LandingPage() {
           <header className="lp-header">
             <div className="lp-brand">
               <img src={logoImg} alt="NeuroLens" className="lp-logo" />
-              NEUROLENS
             </div>
           </header>
 
@@ -104,8 +105,12 @@ export default function LandingPage() {
             <div className="lp-ekg-row">
               <svg viewBox="0 0 140 28" fill="none" className="lp-ekg-svg">
                 <polyline
+                  className="lp-ekg-line"
                   points="0,14 16,14 22,4 28,24 34,14 50,14 56,2 62,26 68,14 84,14 90,8 96,20 102,14 120,14 126,6 132,22 140,14"
-                  stroke="#22C55E" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"
+                  stroke="#22C55E"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                 />
               </svg>
               <span className="lp-ekg-tag">Active scan</span>
@@ -124,7 +129,18 @@ export default function LandingPage() {
 
         </div>
 
-        {/* Informational sections */}
+        {/* Interactive demos first — then narrative sections */}
+        <div
+          ref={featuresBandRef}
+          className={`lp-features-band${featuresBandRevealed ? " lp-features-band--revealed" : ""}`}
+          style={{ background: "#0B1220" }}
+        >
+          <RiskEstimator />
+          <AnatomyExplorer />
+          <ClinicalChat />
+          <SessionDashboard />
+        </div>
+
         <div className="li-block">
           <ProblemStatement />
           <CognitiveLoadSection />
@@ -133,14 +149,6 @@ export default function LandingPage() {
           <BeforeAfter />
           <MBBSLearning />
           <FinalCTA />
-        </div>
-
-        {/* Interactive Features Section */}
-        <div style={{ background: "#0B1220" }}>
-          <RiskEstimator />
-          <AnatomyExplorer />
-          <ClinicalChat />
-          <SessionDashboard />
         </div>
       </div>
     </SessionProvider>
