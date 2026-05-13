@@ -22,6 +22,19 @@
 
 **Watch the walkthrough (Google Drive):** [▶️ NeuroLens prototype video](https://drive.google.com/file/d/1ONlBuKJN0A5EsGpKo3KHZVGlu-yBi_KL/view?usp=sharing)
 
+<img width="1853" height="772" alt="image" src="https://github.com/user-attachments/assets/c25836c4-891b-450d-8637-e0e56055ec16" />
+
+<img width="1538" height="752" alt="image" src="https://github.com/user-attachments/assets/f46dc041-e456-4211-a78d-0ff650d385d1" />
+
+<img width="1355" height="570" alt="image" src="https://github.com/user-attachments/assets/8e556888-84b9-4e92-9119-c324cf71517f" />
+
+<img width="1855" height="777" alt="image" src="https://github.com/user-attachments/assets/e5cbc1f4-a454-4345-b027-712b64b2381b" />
+
+<img width="1860" height="767" alt="image" src="https://github.com/user-attachments/assets/b4c8e1ec-2ea1-4680-a712-401a462b583d" />
+
+<img width="1078" height="606" alt="image" src="https://github.com/user-attachments/assets/923a586c-d389-47fd-a942-a2ea4a76ede5" />
+
+<img width="1090" height="586" alt="image" src="https://github.com/user-attachments/assets/c6ea6851-8574-49a0-afa5-eb41d9807518" />
 
 ---
 
